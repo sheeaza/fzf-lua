@@ -32,6 +32,8 @@ function M.run_command(cmd, ...)
     end
   end
 
+  -- passthrough user args
+  opts.args = args
   builtin[cmd](opts)
 end
 

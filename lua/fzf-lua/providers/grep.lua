@@ -9,6 +9,33 @@ local make_entry = require "fzf-lua.make_entry"
 local M = {}
 
 ---@param opts table
+---@return string?
+local get_sgrep_cmd = function(opts)
+  if opts.raw_cmd and #opts.raw_cmd > 0 then
+    return opts.raw_cmd
+  end
+  local command, is_rg, is_grep = nil, nil, nil
+
+  rg_bin = opts.rg_bin or "rg"
+  grep_bin = opts.grep_bin or "grep"
+
+  if opts.cmd and #opts.cmd > 0 then
+    command = opts.cmd
+  elseif vim.fn.executable(rg_bin) == 1 then
+    is_rg = true
+    command = string.format("%s %s", rg_bin, opts.rg_opts)
+  elseif utils.__IS_WINDOWS then
+    utils.warn("Grep requires installing 'rg' on Windows.")
+    return nil
+  else
+    is_grep = true
+    command = string.format("%s %s",grep_bin,  opts.grep_opts)
+  end
+
+  return command
+end
+
+---@param opts table
 ---@param search_query string
 ---@param no_esc boolean|number
 ---@return string?
@@ -549,6 +576,45 @@ end
 
 M.lgrep_loclist = function(opts)
   return grep_list(opts, true, true)
+end
+
+M.sgrep = function(opts)
+  opts = config.normalize_opts(opts, "grep")
+  if not opts then return end
+
+  -- workaround to remove the '-e', don't make it global/static, let user decide when to use '-e' or
+  -- even with multi '-e'.
+  -- keep other defaults as global/static
+  opts.rg_opts = opts.rg_opts:gsub("-e", "")
+  -- passthrough user args to grep cmd
+  opts.rg_opts = opts.rg_opts .. table.concat(opts.args, " ")
+
+  if utils.has(opts, "fzf") and not opts.prompt and opts.search and #opts.search > 0 then
+    opts.prompt = utils.ansi_from_hl(opts.hls.live_prompt, opts.search) .. " > "
+  end
+
+  -- get the grep command before saving the last search
+  -- in case the search string is overwritten by 'rg_glob'
+  opts.cmd = get_sgrep_cmd(opts)
+  if not opts.cmd then return end
+
+  local contents = core.mt_cmd_wrapper(vim.tbl_deep_extend("force", opts,
+    -- query was already parsed for globs inside 'get_grep_cmd'
+    -- no need for our external headless instance to parse again
+    { rg_glob = false }))
+
+  -- by redirecting the error stream to stdout
+  -- we make sure a clear error message is displayed
+  -- when the user enters bad regex expressions
+  if type(contents) == "string" then
+    contents = contents .. " 2>&1"
+  end
+
+  -- search query in header line
+  opts = core.set_title_flags(opts, { "cmd" })
+  opts = core.set_header(opts, opts.headers or { "actions", "cwd", "search" })
+  opts = core.set_fzf_field_index(opts)
+  core.fzf_exec(contents, opts)
 end
 
 return M

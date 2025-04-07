@@ -216,6 +216,7 @@ do
     files = { "fzf-lua.providers.files", "files" },
     args = { "fzf-lua.providers.files", "args" },
     grep = { "fzf-lua.providers.grep", "grep" },
+    sgrep = { "fzf-lua.providers.grep", "sgrep" },
     grep_last = { "fzf-lua.providers.grep", "grep_last" },
     grep_cword = { "fzf-lua.providers.grep", "grep_cword" },
     grep_cWORD = { "fzf-lua.providers.grep", "grep_cWORD" },
